@@ -14,6 +14,8 @@ macOS、Windows、浏览器三种用法，同一套交互。
 | Windows 10/11 x64 | [Photochooser-1.0.0-windows-x64.zip](https://github.com/logex-linux/photochooser/releases/latest/download/Photochooser-1.0.0-windows-x64.zip) | 解压后运行 `Photochooser.exe`，删除进回收站 |
 | 任意浏览器 | [photochooser.html](https://github.com/logex-linux/photochooser/releases/latest/download/photochooser-1.0.0.html) | 单文件，双击打开，无需安装 |
 
+在线版：<https://logex-linux.github.io/photochooser/>（Chrome / Edge 可直接删除文件）
+
 首次打开：
 
 - **macOS** 是 ad-hoc 签名、未公证。若提示「无法验证开发者」，右键 App → 打开；或执行
@@ -110,6 +112,7 @@ web/src/                   共享 Web UI（core / source / worker / app）
 desktop/                   Windows 的 Electron 外壳（原生选目录、回收站）
 script/                    图标、App、DMG、Web、Windows 构建脚本
 Tests/                     Swift 测试
+docs/                      截图，以及 GitHub Pages 用的单文件构建
 ```
 
 ## 已知限制

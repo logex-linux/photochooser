@@ -1,0 +1,2483 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="Photochooser — 用键盘快速筛选一堆照片：保留、标记删除、撤销，三键完成。">
+    <title>Photochooser · 快速筛照片</title>
+    <style>
+:root {
+    --bg: #080a0e;
+    --bg-soft: #0d1016;
+    --panel: rgba(17, 21, 28, 0.82);
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --text: #eef2f8;
+    --muted: #97a2b2;
+    --faint: #6b7585;
+    --accent: #7aa2ff;
+    --accent-strong: #4f7dff;
+    --danger: #ff7070;
+    --ok: #3ddba3;
+    --radius: 12px;
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable",
+        "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+}
+
+kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 5px;
+    border: 1px solid var(--line-strong);
+    border-bottom-width: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1;
+}
+
+.app {
+    display: grid;
+    grid-template-rows: 56px minmax(0, 1fr) auto auto;
+    height: 100dvh;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+    background: rgba(10, 12, 17, 0.72);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    z-index: 10;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.logo {
+    width: 26px;
+    height: 26px;
+    filter: drop-shadow(0 4px 10px rgba(110, 140, 255, 0.3));
+}
+
+.brand-name {
+    font-weight: 620;
+    letter-spacing: 0.2px;
+    font-size: 14.5px;
+}
+
+.badge {
+    font-size: 10.5px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(122, 162, 255, 0.32);
+    background: rgba(122, 162, 255, 0.1);
+    padding: 1px 7px;
+    border-radius: 999px;
+}
+
+.folder-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    max-width: 34vw;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.folder-chip svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    color: var(--faint);
+}
+
+.folder-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-weight: 520;
+}
+
+.folder-kind {
+    flex: none;
+    color: var(--faint);
+    font-size: 11.5px;
+    border-left: 1px solid var(--line);
+    padding-left: 8px;
+}
+
+.topbar-spacer {
+    flex: 1;
+}
+
+.stats {
+    display: flex;
+    gap: 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-right: 4px;
+}
+
+.stat b {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-right: 2px;
+}
+
+.stat.ok b {
+    color: var(--ok);
+}
+
+.stat.bad b {
+    color: var(--danger);
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--line-strong);
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 140ms ease, border-color 140ms ease, transform 90ms ease,
+        box-shadow 160ms ease, opacity 140ms ease;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.btn[disabled] {
+    opacity: 0.38;
+    pointer-events: none;
+}
+
+.btn.primary {
+    background: linear-gradient(180deg, #6f9bff, #4b77ef);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 8px 22px rgba(76, 119, 239, 0.28);
+}
+
+.btn.primary:hover {
+    background: linear-gradient(180deg, #7ea6ff, #5a84f5);
+    box-shadow: 0 10px 26px rgba(76, 119, 239, 0.36);
+}
+
+.btn.danger {
+    color: #ffb9b9;
+    border-color: rgba(255, 112, 112, 0.36);
+    background: rgba(255, 112, 112, 0.1);
+}
+
+.btn.danger:hover {
+    background: rgba(255, 112, 112, 0.18);
+    border-color: rgba(255, 112, 112, 0.5);
+}
+
+.btn.keep {
+    border-color: rgba(61, 219, 163, 0.3);
+    background: rgba(61, 219, 163, 0.1);
+    color: #a9f2d6;
+}
+
+.btn.keep:hover {
+    background: rgba(61, 219, 163, 0.18);
+}
+
+.btn.reject {
+    border-color: rgba(255, 112, 112, 0.28);
+    background: rgba(255, 112, 112, 0.08);
+    color: #ffc0c0;
+}
+
+.btn.reject:hover {
+    background: rgba(255, 112, 112, 0.16);
+}
+
+.btn.icon {
+    width: 34px;
+    padding: 0;
+    font-size: 15px;
+}
+
+.btn.big {
+    height: 42px;
+    padding: 0 22px;
+    font-size: 14.5px;
+    border-radius: 999px;
+}
+
+.btn kbd {
+    background: rgba(0, 0, 0, 0.18);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: inherit;
+    opacity: 0.8;
+}
+
+/* ---------- stage ---------- */
+
+.stage {
+    position: relative;
+    min-height: 0;
+    background:
+        radial-gradient(120% 90% at 50% 0%, rgba(70, 100, 180, 0.16), transparent 60%),
+        radial-gradient(80% 70% at 50% 110%, rgba(40, 60, 120, 0.12), transparent 65%),
+        var(--bg);
+    overflow: hidden;
+}
+
+.empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 28px;
+}
+
+.empty-card {
+    width: min(560px, 100%);
+    text-align: center;
+    padding: 42px 34px 34px;
+    border-radius: 22px;
+    border: 1px dashed rgba(255, 255, 255, 0.13);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.empty-card.dragover {
+    border-color: var(--accent);
+    background: rgba(122, 162, 255, 0.08);
+}
+
+.empty-icon {
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 18px;
+    color: var(--accent);
+    opacity: 0.9;
+}
+
+.empty-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.empty h1 {
+    margin: 0 0 10px;
+    font-size: 22px;
+    font-weight: 620;
+    letter-spacing: 0.2px;
+}
+
+.lede {
+    margin: 0 auto 24px;
+    max-width: 420px;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.7;
+}
+
+.hint {
+    margin: 18px 0 0;
+    color: var(--faint);
+    font-size: 12px;
+}
+
+.viewer {
+    position: absolute;
+    inset: 0;
+}
+
+#preview {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.viewer-head {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 14px 18px 30px;
+    background: linear-gradient(180deg, rgba(8, 10, 14, 0.72), transparent);
+    pointer-events: none;
+}
+
+.photo-name {
+    font-size: 12.5px;
+    font-weight: 520;
+    color: rgba(238, 242, 248, 0.9);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.photo-meta {
+    font-size: 11.5px;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+}
+
+.rejected-flag {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255, 112, 112, 0.16);
+    border: 1px solid rgba(255, 112, 112, 0.38);
+    color: #ffc9c9;
+    font-size: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.rejected-flag kbd {
+    color: #ffc9c9;
+    border-color: rgba(255, 201, 201, 0.35);
+    background: rgba(0, 0, 0, 0.18);
+}
+
+.loading {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(12, 15, 21, 0.82);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12.5px;
+    backdrop-filter: blur(10px);
+}
+
+.spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-top-color: var(--accent);
+    animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ---------- filmstrip ---------- */
+
+.filmstrip {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    height: 92px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: var(--bg-soft);
+    border-top: 1px solid var(--line);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.filmstrip::-webkit-scrollbar {
+    height: 8px;
+}
+
+.filmstrip::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+}
+
+.thumb {
+    position: relative;
+    flex: none;
+    width: 68px;
+    height: 68px;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: #141821;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 140ms ease, transform 140ms ease, opacity 140ms ease;
+}
+
+.thumb:hover {
+    border-color: rgba(255, 255, 255, 0.28);
+    transform: translateY(-1px);
+}
+
+.thumb:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.thumb.is-current {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 8px 20px rgba(80, 120, 240, 0.25);
+}
+
+.thumb.is-rejected img {
+    opacity: 0.32;
+}
+
+.thumb.is-rejected::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 80, 80, 0.18);
+}
+
+.thumb .thumb-badge {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    z-index: 2;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(255, 90, 90, 0.9);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.thumb.is-rejected .thumb-badge {
+    display: block;
+}
+
+.thumb-badge {
+    display: none;
+}
+
+.thumb .thumb-index {
+    position: absolute;
+    left: 5px;
+    top: 4px;
+    z-index: 2;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.82);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* ---------- controls ---------- */
+
+.controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 62px;
+    padding: 0 16px;
+    border-top: 1px solid var(--line);
+    background: rgba(11, 14, 19, 0.9);
+}
+
+.controls-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.controls-group.center {
+    gap: 10px;
+}
+
+.controls-group.right {
+    justify-content: flex-end;
+}
+
+.progress {
+    color: var(--muted);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    margin-right: 4px;
+}
+
+/* ---------- dialog & toast ---------- */
+
+.help {
+    width: min(420px, calc(100vw - 40px));
+    padding: 24px;
+    border-radius: 18px;
+    border: 1px solid var(--line-strong);
+    background: #12161e;
+    color: var(--text);
+    box-shadow: var(--shadow);
+}
+
+.help::backdrop {
+    background: rgba(3, 5, 9, 0.6);
+    backdrop-filter: blur(3px);
+}
+
+.help h2 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 620;
+}
+
+.help dl {
+    margin: 0 0 16px;
+    display: grid;
+    gap: 10px;
+}
+
+.help dl > div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.help dt {
+    flex: none;
+    width: 76px;
+    display: flex;
+    gap: 4px;
+}
+
+.help dd {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.help-note {
+    margin: 0 0 18px;
+    color: var(--faint);
+    font-size: 12px;
+}
+
+.help form {
+    margin: 0;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 178px;
+    transform: translate(-50%, 8px);
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: rgba(20, 25, 34, 0.94);
+    border: 1px solid var(--line-strong);
+    color: var(--text);
+    font-size: 12.5px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: opacity 180ms ease, transform 180ms ease;
+    pointer-events: none;
+    z-index: 40;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.toast.bad {
+    border-color: rgba(255, 112, 112, 0.4);
+    color: #ffc9c9;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 860px) {
+    .stats {
+        display: none;
+    }
+
+    .folder-kind {
+        display: none;
+    }
+
+    .folder-chip {
+        max-width: 42vw;
+    }
+
+    .empty-card {
+        padding: 32px 22px 26px;
+    }
+}
+
+@media (max-width: 620px) {
+    .brand-name,
+    .badge {
+        display: none;
+    }
+
+    .controls {
+        height: 58px;
+        padding: 0 10px;
+    }
+
+    .controls-group.center {
+        gap: 6px;
+    }
+
+    .btn {
+        padding: 0 11px;
+        font-size: 12.5px;
+    }
+
+    .btn kbd {
+        display: none;
+    }
+
+    .filmstrip {
+        height: 82px;
+        padding: 8px 10px;
+    }
+
+    .thumb {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+</style>
+</head>
+<body>
+    <div class="app">
+        <header class="topbar">
+            <div class="brand">
+                <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#6f9bff"/>
+                            <stop offset="1" stop-color="#9a6bff"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="1" y="1" width="30" height="30" rx="8.5" fill="url(#logoGradient)"/>
+                    <rect x="7" y="9" width="15" height="11" rx="2.4" fill="#fff" opacity="0.96"/>
+                    <circle cx="18.4" cy="12.4" r="1.6" fill="#f5c451"/>
+                    <path d="M9 19l3.6-4.4 3.1 3.5 2-2.2L21 19z" fill="#3f6fdc"/>
+                    <circle cx="23.6" cy="22.4" r="5.2" fill="#10b981" stroke="#fff" stroke-width="1.4"/>
+                    <path d="M21.2 22.5l1.7 1.7 3-3.2" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span class="brand-name">Photochooser</span>
+                <span class="badge" id="modeBadge">Web</span>
+            </div>
+
+            <div class="folder-chip" id="folderChip" hidden>
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.2c0-.8.6-1.4 1.4-1.4h3l1.3 1.5h5.9c.8 0 1.4.6 1.4 1.4v6.1c0 .8-.6 1.4-1.4 1.4H2.9c-.8 0-1.4-.6-1.4-1.4z" fill="currentColor"/></svg>
+                <span class="folder-name" id="folderName">—</span>
+                <span class="folder-kind" id="sourceKind"></span>
+            </div>
+
+            <div class="topbar-spacer"></div>
+
+            <div class="stats" id="stats" hidden>
+                <span class="stat"><b id="statReviewed">0</b> 已看</span>
+                <span class="stat ok"><b id="statKept">0</b> 保留</span>
+                <span class="stat bad"><b id="statRejected">0</b> 待删</span>
+            </div>
+
+            <button class="btn danger" id="applyBtn" hidden>应用删除</button>
+            <button class="btn primary" id="openBtn">打开文件夹</button>
+        </header>
+
+        <main class="stage" id="stage">
+            <div class="empty" id="empty">
+                <div class="empty-card">
+                    <div class="empty-icon">
+                        <svg viewBox="0 0 48 48" aria-hidden="true">
+                            <rect x="5" y="9" width="38" height="30" rx="5" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="33" cy="18" r="3.2" fill="currentColor"/>
+                            <path d="M9 34l10-12 7.5 8.5 4.8-5L41 34z" fill="currentColor" opacity="0.55"/>
+                        </svg>
+                    </div>
+                    <h1>把一堆照片，快速筛成几张</h1>
+                    <p class="lede">选好文件夹，用键盘就够了：<kbd>1</kbd> 保留并下一张，<kbd>2</kbd> 标记删除，<kbd>3</kbd> 撤销。</p>
+                    <button class="btn primary big" id="emptyOpen">选择照片文件夹</button>
+                    <p class="hint" id="emptyHint">支持 JPG · PNG · WebP · AVIF · GIF　·　HEIC 请用桌面版</p>
+                </div>
+            </div>
+
+            <div class="viewer" id="viewer" hidden>
+                <canvas id="preview"></canvas>
+                <div class="viewer-head">
+                    <div class="photo-name" id="photoName"></div>
+                    <div class="photo-meta" id="photoMeta"></div>
+                </div>
+                <div class="rejected-flag" id="rejectedFlag" hidden>已标记删除 · <kbd>3</kbd> 撤销</div>
+                <div class="loading" id="loading" hidden><span class="spinner"></span><span>解码中…</span></div>
+            </div>
+        </main>
+
+        <section class="filmstrip" id="filmstrip" aria-label="照片胶片条" hidden></section>
+
+        <footer class="controls" id="controls" hidden>
+            <div class="controls-group">
+                <button class="btn icon" id="prevBtn" title="上一张（←）" aria-label="上一张">←</button>
+                <button class="btn icon" id="nextBtn" title="下一张（→）" aria-label="下一张">→</button>
+            </div>
+
+            <div class="controls-group center">
+                <button class="btn keep" id="keepBtn"><kbd>1</kbd>保留</button>
+                <button class="btn reject" id="rejectBtn"><kbd>2</kbd>删除</button>
+                <button class="btn" id="undoBtn"><kbd>3</kbd>撤销</button>
+            </div>
+
+            <div class="controls-group right">
+                <span class="progress" id="progress">0 张</span>
+                <button class="btn icon" id="helpBtn" title="快捷键" aria-label="快捷键">?</button>
+            </div>
+        </footer>
+    </div>
+
+    <dialog class="help" id="helpDialog">
+        <h2>快捷键</h2>
+        <dl>
+            <div><dt><kbd>1</kbd></dt><dd>保留这张，跳到下一张</dd></div>
+            <div><dt><kbd>2</kbd></dt><dd>标记删除，跳到下一张（不会立刻删）</dd></div>
+            <div><dt><kbd>3</kbd></dt><dd>撤销上一次标记</dd></div>
+            <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>上一张 / 下一张</dd></div>
+            <div><dt><kbd>Esc</kbd></dt><dd>关闭这个面板</dd></div>
+        </dl>
+        <p class="help-note" id="helpNote">标记完成后点右上角「应用删除」一次性处理。</p>
+        <form method="dialog"><button class="btn">知道了</button></form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+
+    <script type="text/plain" id="pc-worker-source">
+/**
+ * Pure helpers shared by the web app, the worker and the unit tests.
+ * No DOM access here.
+ */
+(function (root, factory) {
+    const api = factory();
+    if (typeof module === 'object' && module.exports) {
+        module.exports = api;
+    } else {
+        root.PC = api;
+    }
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+    'use strict';
+
+    const DESKTOP_EXTENSIONS = ['hif', 'heic', 'heif', 'jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp'];
+    const BROWSER_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp'];
+
+    function extensionOf(name) {
+        const dot = String(name).lastIndexOf('.');
+        return dot === -1 ? '' : String(name).slice(dot + 1).toLowerCase();
+    }
+
+    function isDesktopPhoto(name) {
+        return DESKTOP_EXTENSIONS.indexOf(extensionOf(name)) !== -1;
+    }
+
+    function isBrowserPhoto(name) {
+        return BROWSER_EXTENSIONS.indexOf(extensionOf(name)) !== -1;
+    }
+
+    /** Finder-like ordering: IMG_2 before IMG_10. */
+    function compareNames(a, b) {
+        return String(a).localeCompare(String(b), undefined, {
+            numeric: true,
+            sensitivity: 'base'
+        });
+    }
+
+    function sortByName(names) {
+        return names.slice().sort(compareNames);
+    }
+
+    function clampIndex(index, length) {
+        if (length <= 0) return 0;
+        return Math.min(Math.max(index, 0), length - 1);
+    }
+
+    function formatProgress(index, total) {
+        if (!total) return '0 张';
+        return (clampIndex(index, total) + 1) + ' / ' + total;
+    }
+
+    function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let value = bytes;
+        let unit = 0;
+        while (value >= 1024 && unit < units.length - 1) {
+            value /= 1024;
+            unit += 1;
+        }
+        const digits = value >= 10 || unit === 0 ? 0 : 1;
+        return value.toFixed(digits) + ' ' + units[unit];
+    }
+
+    /** Size the decoded bitmap should have, never upscaling. */
+    function targetDimensions(width, height, maxPixel) {
+        if (!width || !height) return null;
+        const longest = Math.max(width, height);
+        if (longest <= maxPixel) return { width, height };
+        const scale = maxPixel / longest;
+        return {
+            width: Math.max(1, Math.round(width * scale)),
+            height: Math.max(1, Math.round(height * scale))
+        };
+    }
+
+    /**
+     * Reads the EXIF orientation (1-8) from a JPEG header.
+     * Anything else, or any parse problem, is treated as upright.
+     */
+    function readOrientation(buffer) {
+        if (!buffer || buffer.byteLength < 16) return 1;
+        const view = new DataView(buffer);
+        if (view.getUint16(0, false) !== 0xffd8) return 1;
+
+        let offset = 2;
+        while (offset + 4 < view.byteLength) {
+            if (view.getUint8(offset) !== 0xff) {
+                offset += 1;
+                continue;
+            }
+            const marker = view.getUint8(offset + 1);
+            if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) {
+                offset += 2;
+                continue;
+            }
+            const length = view.getUint16(offset + 2, false);
+            if (marker === 0xe1) {
+                const start = offset + 4;
+                if (start + 6 > view.byteLength) return 1;
+                if (view.getUint32(start, false) !== 0x45786966) return 1; // "Exif"
+
+                const tiff = start + 6;
+                if (tiff + 8 > view.byteLength) return 1;
+                const little = view.getUint16(tiff, false) === 0x4949;
+                const ifd = tiff + view.getUint32(tiff + 4, little);
+                if (ifd + 2 > view.byteLength) return 1;
+
+                const count = view.getUint16(ifd, little);
+                for (let i = 0; i < count; i += 1) {
+                    const entry = ifd + 2 + i * 12;
+                    if (entry + 12 > view.byteLength) return 1;
+                    if (view.getUint16(entry, little) === 0x0112) {
+                        const value = view.getUint16(entry + 8, little);
+                        return value >= 1 && value <= 8 ? value : 1;
+                    }
+                }
+                return 1;
+            }
+            if (length < 2) return 1;
+            offset += 2 + length;
+        }
+        return 1;
+    }
+
+    /**
+     * Reads image dimensions from the file header so the worker can ask the
+     * decoder for an exactly sized bitmap instead of decoding full resolution.
+     */
+    function readImageSize(buffer) {
+        if (!buffer || buffer.byteLength < 24) return null;
+        const view = new DataView(buffer);
+
+        // JPEG
+        if (view.getUint8(0) === 0xff && view.getUint8(1) === 0xd8) {
+            let offset = 2;
+            while (offset + 9 < view.byteLength) {
+                if (view.getUint8(offset) !== 0xff) {
+                    offset += 1;
+                    continue;
+                }
+                const marker = view.getUint8(offset + 1);
+                if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+                    offset += 2;
+                    continue;
+                }
+                const length = view.getUint16(offset + 2, false);
+                const isSOF = marker >= 0xc0 && marker <= 0xcf &&
+                    marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+                if (isSOF) {
+                    return {
+                        height: view.getUint16(offset + 5, false),
+                        width: view.getUint16(offset + 7, false)
+                    };
+                }
+                if (length < 2) return null;
+                offset += 2 + length;
+            }
+            return null;
+        }
+
+        // PNG
+        if (view.getUint8(0) === 0x89 && view.getUint32(1) === 0x504e47) {
+            return { width: view.getUint32(16, false), height: view.getUint32(20, false) };
+        }
+
+        // GIF
+        if (view.getUint32(0) === 0x47494638) {
+            return { width: view.getUint16(6, true), height: view.getUint16(8, true) };
+        }
+
+        // WebP
+        if (view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) {
+            const chunk = String.fromCharCode(
+                view.getUint8(12), view.getUint8(13), view.getUint8(14), view.getUint8(15)
+            );
+            if (chunk === 'VP8 ') {
+                return {
+                    width: view.getUint16(26, true) & 0x3fff,
+                    height: view.getUint16(28, true) & 0x3fff
+                };
+            }
+            if (chunk === 'VP8L') {
+                const b1 = view.getUint8(21);
+                const b2 = view.getUint8(22);
+                const b3 = view.getUint8(23);
+                const b4 = view.getUint8(24);
+                return {
+                    width: 1 + (((b2 & 0x3f) << 8) | b1),
+                    height: 1 + (((b4 & 0x0f) << 10) | (b3 << 2) | (b2 >> 6))
+                };
+            }
+            if (chunk === 'VP8X') {
+                return {
+                    width: 1 + (view.getUint8(24) | (view.getUint8(25) << 8) | (view.getUint8(26) << 16)),
+                    height: 1 + (view.getUint8(27) | (view.getUint8(28) << 8) | (view.getUint8(29) << 16))
+                };
+            }
+            return null;
+        }
+
+        // BMP
+        if (view.getUint8(0) === 0x42 && view.getUint8(1) === 0x4d) {
+            return {
+                width: Math.abs(view.getInt32(18, true)),
+                height: Math.abs(view.getInt32(22, true))
+            };
+        }
+
+        // AVIF / HEIF: locate the first "ispe" box.
+        const bytes = new Uint8Array(buffer);
+        for (let i = 4; i + 16 < bytes.length; i += 1) {
+            if (bytes[i] === 0x69 && bytes[i + 1] === 0x73 && bytes[i + 2] === 0x70 && bytes[i + 3] === 0x65) {
+                return {
+                    width: view.getUint32(i + 8, false),
+                    height: view.getUint32(i + 12, false)
+                };
+            }
+        }
+        return null;
+    }
+
+    return {
+        DESKTOP_EXTENSIONS,
+        BROWSER_EXTENSIONS,
+        extensionOf,
+        isDesktopPhoto,
+        isBrowserPhoto,
+        compareNames,
+        sortByName,
+        clampIndex,
+        formatProgress,
+        formatBytes,
+        targetDimensions,
+        readImageSize,
+        readOrientation
+    };
+});
+
+/**
+ * Decode worker: turns a File/Blob into a right-sized bitmap or a small WebP
+ * thumbnail, so the UI thread never touches full-resolution pixels.
+ */
+/* global PC */
+if (typeof PC === 'undefined' && typeof importScripts === 'function') {
+    try {
+        importScripts('core.js');
+    } catch (error) {
+        // In the single-file build core.js is already inlined above.
+    }
+}
+
+const queue = [];
+let pumping = false;
+let cancelled = new Set();
+
+self.onmessage = function (event) {
+    const job = event.data || {};
+
+    if (job.type === 'cancel') {
+        cancelled = new Set(job.ids || []);
+        for (let i = queue.length - 1; i >= 0; i -= 1) {
+            if (cancelled.has(queue[i].id)) queue.splice(i, 1);
+        }
+        return;
+    }
+
+    queue.push(job);
+    pump();
+};
+
+async function pump() {
+    if (pumping) return;
+    pumping = true;
+
+    while (queue.length) {
+        // Urgent (current photo) jobs jump ahead of speculative prefetches.
+        queue.sort(function (a, b) {
+            return (a.priority || 0) - (b.priority || 0) || a.id - b.id;
+        });
+        const job = queue.shift();
+        if (cancelled.has(job.id)) continue;
+
+        try {
+            const result = await run(job);
+            if (cancelled.has(job.id)) {
+                if (result.bitmap) result.bitmap.close();
+                continue;
+            }
+            if (result.bitmap) {
+                self.postMessage({ id: job.id, ok: true, bitmap: result.bitmap }, [result.bitmap]);
+            } else {
+                self.postMessage({ id: job.id, ok: true, blob: result.blob });
+            }
+        } catch (error) {
+            self.postMessage({
+                id: job.id,
+                ok: false,
+                error: String((error && error.message) || error)
+            });
+        }
+    }
+
+    pumping = false;
+}
+
+async function run(job) {
+    if (job.kind === 'thumb') {
+        const bitmap = await decode(job.blob, job.maxPixel);
+        const scale = Math.min(1, job.maxPixel / Math.max(bitmap.width, bitmap.height));
+        const width = Math.max(1, Math.round(bitmap.width * scale));
+        const height = Math.max(1, Math.round(bitmap.height * scale));
+        const canvas = new OffscreenCanvas(width, height);
+        const context = canvas.getContext('2d', { alpha: false });
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(bitmap, 0, 0, width, height);
+        bitmap.close();
+        const blob = await canvas.convertToBlob({
+            type: 'image/webp',
+            quality: job.quality || 0.82
+        });
+        return { blob: blob };
+    }
+
+    const bitmap = await decode(job.blob, job.maxPixel);
+    return { bitmap: bitmap };
+}
+
+async function decode(blob, maxPixel) {
+    const meta = await readMeta(blob);
+    if (meta) {
+        // EXIF orientations 5-8 rotate the image a quarter turn, so the stored
+        // width/height are swapped relative to what the decoder returns.
+        const swapped = meta.orientation >= 5 && meta.orientation <= 8;
+        const width = swapped ? meta.height : meta.width;
+        const height = swapped ? meta.width : meta.height;
+        const target = PC.targetDimensions(width, height, maxPixel);
+
+        if (target && (target.width !== width || target.height !== height)) {
+            return createImageBitmap(blob, {
+                resizeWidth: target.width,
+                resizeHeight: target.height,
+                resizeQuality: 'high'
+            });
+        }
+    }
+    return createImageBitmap(blob);
+}
+
+async function readMeta(blob) {
+    let buffer;
+    try {
+        buffer = await blob.slice(0, 131072).arrayBuffer();
+    } catch (error) {
+        return null;
+    }
+
+    let size = PC.readImageSize(buffer);
+    if (!size) {
+        try {
+            buffer = await blob.arrayBuffer();
+            size = PC.readImageSize(buffer);
+        } catch (error) {
+            return null;
+        }
+    }
+    if (!size || !size.width || !size.height) return null;
+
+    return {
+        width: size.width,
+        height: size.height,
+        orientation: PC.readOrientation(buffer)
+    };
+}
+
+</script>
+    <script>
+/**
+ * Pure helpers shared by the web app, the worker and the unit tests.
+ * No DOM access here.
+ */
+(function (root, factory) {
+    const api = factory();
+    if (typeof module === 'object' && module.exports) {
+        module.exports = api;
+    } else {
+        root.PC = api;
+    }
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+    'use strict';
+
+    const DESKTOP_EXTENSIONS = ['hif', 'heic', 'heif', 'jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp'];
+    const BROWSER_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif', 'bmp'];
+
+    function extensionOf(name) {
+        const dot = String(name).lastIndexOf('.');
+        return dot === -1 ? '' : String(name).slice(dot + 1).toLowerCase();
+    }
+
+    function isDesktopPhoto(name) {
+        return DESKTOP_EXTENSIONS.indexOf(extensionOf(name)) !== -1;
+    }
+
+    function isBrowserPhoto(name) {
+        return BROWSER_EXTENSIONS.indexOf(extensionOf(name)) !== -1;
+    }
+
+    /** Finder-like ordering: IMG_2 before IMG_10. */
+    function compareNames(a, b) {
+        return String(a).localeCompare(String(b), undefined, {
+            numeric: true,
+            sensitivity: 'base'
+        });
+    }
+
+    function sortByName(names) {
+        return names.slice().sort(compareNames);
+    }
+
+    function clampIndex(index, length) {
+        if (length <= 0) return 0;
+        return Math.min(Math.max(index, 0), length - 1);
+    }
+
+    function formatProgress(index, total) {
+        if (!total) return '0 张';
+        return (clampIndex(index, total) + 1) + ' / ' + total;
+    }
+
+    function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let value = bytes;
+        let unit = 0;
+        while (value >= 1024 && unit < units.length - 1) {
+            value /= 1024;
+            unit += 1;
+        }
+        const digits = value >= 10 || unit === 0 ? 0 : 1;
+        return value.toFixed(digits) + ' ' + units[unit];
+    }
+
+    /** Size the decoded bitmap should have, never upscaling. */
+    function targetDimensions(width, height, maxPixel) {
+        if (!width || !height) return null;
+        const longest = Math.max(width, height);
+        if (longest <= maxPixel) return { width, height };
+        const scale = maxPixel / longest;
+        return {
+            width: Math.max(1, Math.round(width * scale)),
+            height: Math.max(1, Math.round(height * scale))
+        };
+    }
+
+    /**
+     * Reads the EXIF orientation (1-8) from a JPEG header.
+     * Anything else, or any parse problem, is treated as upright.
+     */
+    function readOrientation(buffer) {
+        if (!buffer || buffer.byteLength < 16) return 1;
+        const view = new DataView(buffer);
+        if (view.getUint16(0, false) !== 0xffd8) return 1;
+
+        let offset = 2;
+        while (offset + 4 < view.byteLength) {
+            if (view.getUint8(offset) !== 0xff) {
+                offset += 1;
+                continue;
+            }
+            const marker = view.getUint8(offset + 1);
+            if (marker === 0xd8 || (marker >= 0xd0 && marker <= 0xd7)) {
+                offset += 2;
+                continue;
+            }
+            const length = view.getUint16(offset + 2, false);
+            if (marker === 0xe1) {
+                const start = offset + 4;
+                if (start + 6 > view.byteLength) return 1;
+                if (view.getUint32(start, false) !== 0x45786966) return 1; // "Exif"
+
+                const tiff = start + 6;
+                if (tiff + 8 > view.byteLength) return 1;
+                const little = view.getUint16(tiff, false) === 0x4949;
+                const ifd = tiff + view.getUint32(tiff + 4, little);
+                if (ifd + 2 > view.byteLength) return 1;
+
+                const count = view.getUint16(ifd, little);
+                for (let i = 0; i < count; i += 1) {
+                    const entry = ifd + 2 + i * 12;
+                    if (entry + 12 > view.byteLength) return 1;
+                    if (view.getUint16(entry, little) === 0x0112) {
+                        const value = view.getUint16(entry + 8, little);
+                        return value >= 1 && value <= 8 ? value : 1;
+                    }
+                }
+                return 1;
+            }
+            if (length < 2) return 1;
+            offset += 2 + length;
+        }
+        return 1;
+    }
+
+    /**
+     * Reads image dimensions from the file header so the worker can ask the
+     * decoder for an exactly sized bitmap instead of decoding full resolution.
+     */
+    function readImageSize(buffer) {
+        if (!buffer || buffer.byteLength < 24) return null;
+        const view = new DataView(buffer);
+
+        // JPEG
+        if (view.getUint8(0) === 0xff && view.getUint8(1) === 0xd8) {
+            let offset = 2;
+            while (offset + 9 < view.byteLength) {
+                if (view.getUint8(offset) !== 0xff) {
+                    offset += 1;
+                    continue;
+                }
+                const marker = view.getUint8(offset + 1);
+                if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+                    offset += 2;
+                    continue;
+                }
+                const length = view.getUint16(offset + 2, false);
+                const isSOF = marker >= 0xc0 && marker <= 0xcf &&
+                    marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+                if (isSOF) {
+                    return {
+                        height: view.getUint16(offset + 5, false),
+                        width: view.getUint16(offset + 7, false)
+                    };
+                }
+                if (length < 2) return null;
+                offset += 2 + length;
+            }
+            return null;
+        }
+
+        // PNG
+        if (view.getUint8(0) === 0x89 && view.getUint32(1) === 0x504e47) {
+            return { width: view.getUint32(16, false), height: view.getUint32(20, false) };
+        }
+
+        // GIF
+        if (view.getUint32(0) === 0x47494638) {
+            return { width: view.getUint16(6, true), height: view.getUint16(8, true) };
+        }
+
+        // WebP
+        if (view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) {
+            const chunk = String.fromCharCode(
+                view.getUint8(12), view.getUint8(13), view.getUint8(14), view.getUint8(15)
+            );
+            if (chunk === 'VP8 ') {
+                return {
+                    width: view.getUint16(26, true) & 0x3fff,
+                    height: view.getUint16(28, true) & 0x3fff
+                };
+            }
+            if (chunk === 'VP8L') {
+                const b1 = view.getUint8(21);
+                const b2 = view.getUint8(22);
+                const b3 = view.getUint8(23);
+                const b4 = view.getUint8(24);
+                return {
+                    width: 1 + (((b2 & 0x3f) << 8) | b1),
+                    height: 1 + (((b4 & 0x0f) << 10) | (b3 << 2) | (b2 >> 6))
+                };
+            }
+            if (chunk === 'VP8X') {
+                return {
+                    width: 1 + (view.getUint8(24) | (view.getUint8(25) << 8) | (view.getUint8(26) << 16)),
+                    height: 1 + (view.getUint8(27) | (view.getUint8(28) << 8) | (view.getUint8(29) << 16))
+                };
+            }
+            return null;
+        }
+
+        // BMP
+        if (view.getUint8(0) === 0x42 && view.getUint8(1) === 0x4d) {
+            return {
+                width: Math.abs(view.getInt32(18, true)),
+                height: Math.abs(view.getInt32(22, true))
+            };
+        }
+
+        // AVIF / HEIF: locate the first "ispe" box.
+        const bytes = new Uint8Array(buffer);
+        for (let i = 4; i + 16 < bytes.length; i += 1) {
+            if (bytes[i] === 0x69 && bytes[i + 1] === 0x73 && bytes[i + 2] === 0x70 && bytes[i + 3] === 0x65) {
+                return {
+                    width: view.getUint32(i + 8, false),
+                    height: view.getUint32(i + 12, false)
+                };
+            }
+        }
+        return null;
+    }
+
+    return {
+        DESKTOP_EXTENSIONS,
+        BROWSER_EXTENSIONS,
+        extensionOf,
+        isDesktopPhoto,
+        isBrowserPhoto,
+        compareNames,
+        sortByName,
+        clampIndex,
+        formatProgress,
+        formatBytes,
+        targetDimensions,
+        readImageSize,
+        readOrientation
+    };
+});
+
+</script>
+    <script>
+/**
+ * Folder access adapters.
+ *
+ * Three environments are supported, in order of preference:
+ *  1. Electron (Windows build)  – native folder dialog, files served over pcfile://, real Recycle Bin deletes.
+ *  2. Chromium File System Access API – read/write handles, real deletion.
+ *  3. <input webkitdirectory> – read-only fallback for Safari/Firefox and file:// pages.
+ */
+(function (root) {
+    'use strict';
+
+    const PC = root.PC;
+
+    function bridge() {
+        return root.photochooser || null;
+    }
+
+    function isElectron() {
+        const api = bridge();
+        return !!(api && typeof api.pickFolder === 'function');
+    }
+
+    async function pickFolder() {
+        if (isElectron()) return pickElectron();
+
+        if (typeof root.showDirectoryPicker === 'function') {
+            try {
+                return await pickWithHandle();
+            } catch (error) {
+                if (error && error.name === 'AbortError') return null;
+                // file:// pages and unsupported contexts land here.
+                console.warn('File System Access unavailable, falling back:', error);
+            }
+        }
+        return pickWithInput();
+    }
+
+    async function pickElectron() {
+        const result = await bridge().pickFolder();
+        if (!result || !result.entries) return null;
+
+        const entries = result.entries.map(function (item) {
+            return {
+                id: item.path,
+                name: item.name,
+                path: item.path,
+                url: item.url
+            };
+        });
+
+        return {
+            kind: 'electron',
+            folderName: result.name,
+            folderPath: result.path,
+            canDelete: true,
+            canRestore: true,
+            entries: entries,
+            skipped: 0
+        };
+    }
+
+    async function pickWithHandle() {
+        const dirHandle = await root.showDirectoryPicker({ id: 'photochooser', mode: 'readwrite' });
+        const entries = [];
+        let skipped = 0;
+
+        for await (const [name, handle] of dirHandle.entries()) {
+            if (handle.kind !== 'file') continue;
+            if (!PC.isBrowserPhoto(name)) {
+                if (PC.isDesktopPhoto(name)) skipped += 1;
+                continue;
+            }
+            entries.push({ id: name, name: name, handle: handle });
+        }
+
+        entries.sort(function (a, b) { return PC.compareNames(a.name, b.name); });
+
+        return {
+            kind: 'handle',
+            folderName: dirHandle.name,
+            dirHandle: dirHandle,
+            canDelete: true,
+            canRestore: false,
+            entries: entries,
+            skipped: skipped
+        };
+    }
+
+    function pickWithInput() {
+        return new Promise(function (resolve) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.webkitdirectory = true;
+            input.style.display = 'none';
+            document.body.appendChild(input);
+
+            let settled = false;
+            function finish(value) {
+                if (settled) return;
+                settled = true;
+                input.remove();
+                resolve(value);
+            }
+
+            input.addEventListener('change', function () {
+                const files = Array.prototype.slice.call(input.files || []);
+                finish(entriesFromFiles(files));
+            });
+            input.addEventListener('cancel', function () { finish(null); });
+            input.click();
+        });
+    }
+
+    function entriesFromFiles(files) {
+        const entries = [];
+        let skipped = 0;
+        let folderName = null;
+
+        for (const file of files) {
+            const relative = file.webkitRelativePath || file.name;
+            const parts = relative.split('/');
+            if (parts.length > 1) folderName = folderName || parts[0];
+            if (parts.length > 2) continue; // only the top level, like the desktop app
+
+            const name = file.name;
+            if (!PC.isBrowserPhoto(name)) {
+                if (PC.isDesktopPhoto(name)) skipped += 1;
+                continue;
+            }
+            entries.push({
+                id: relative + '#' + entries.length,
+                name: name,
+                file: file,
+                size: file.size
+            });
+        }
+
+        entries.sort(function (a, b) { return PC.compareNames(a.name, b.name); });
+
+        return {
+            kind: 'files',
+            folderName: folderName || '已选择文件夹',
+            canDelete: false,
+            canRestore: false,
+            entries: entries,
+            skipped: skipped
+        };
+    }
+
+    async function entriesFromDirectoryEntry(dirEntry) {
+        const files = [];
+        const reader = dirEntry.createReader();
+
+        function readBatch() {
+            return new Promise(function (resolve, reject) {
+                reader.readEntries(resolve, reject);
+            });
+        }
+
+        while (true) {
+            const batch = await readBatch();
+            if (!batch.length) break;
+            for (const item of batch) {
+                if (item.isFile) {
+                    const file = await new Promise(function (resolve, reject) {
+                        item.file(resolve, reject);
+                    });
+                    files.push(file);
+                }
+            }
+        }
+
+        const result = entriesFromFiles(files);
+        result.folderName = dirEntry.name || result.folderName;
+        return result;
+    }
+
+    function blobFor(entry) {
+        if (entry.file) return Promise.resolve(entry.file);
+        if (entry.handle) return entry.handle.getFile();
+        if (entry.url) {
+            return fetch(entry.url).then(function (response) {
+                if (!response.ok) throw new Error('读取失败：' + response.status);
+                return response.blob();
+            });
+        }
+        return Promise.reject(new Error('无法读取该照片'));
+    }
+
+    async function removeEntries(source, entries) {
+        if (source.kind === 'electron') {
+            const result = await bridge().trash(entries.map(function (entry) { return entry.path; }));
+            const trashed = new Set(result.trashed || []);
+            return {
+                removed: entries.filter(function (entry) { return trashed.has(entry.path); }),
+                failed: result.failed || 0
+            };
+        }
+
+        if (source.kind === 'handle') {
+            const removed = [];
+            let failed = 0;
+            for (const entry of entries) {
+                try {
+                    if (entry.handle && typeof entry.handle.remove === 'function') {
+                        await entry.handle.remove();
+                    } else {
+                        await source.dirHandle.removeEntry(entry.name);
+                    }
+                    removed.push(entry);
+                } catch (error) {
+                    console.warn('remove failed', entry.name, error);
+                    failed += 1;
+                }
+            }
+            return { removed: removed, failed: failed };
+        }
+
+        throw new Error('当前打开方式不支持删除');
+    }
+
+    function describe(source) {
+        if (!source) return '';
+        if (source.kind === 'electron') return '桌面版 · 删除到回收站';
+        if (source.kind === 'handle') return '浏览器版 · 可直接删除文件';
+        return '浏览器版 · 只读模式';
+    }
+
+    root.PCSource = {
+        isElectron: isElectron,
+        pickFolder: pickFolder,
+        entriesFromFiles: entriesFromFiles,
+        entriesFromDirectoryEntry: entriesFromDirectoryEntry,
+        blobFor: blobFor,
+        removeEntries: removeEntries,
+        describe: describe
+    };
+})(window);
+
+</script>
+    <script>
+/**
+ * Photochooser web app controller.
+ *
+ * Performance rules:
+ *  - never decode on the UI thread (two workers: preview + thumbnails)
+ *  - decode at display size, not full resolution
+ *  - keep a small LRU of decoded bitmaps and prefetch neighbours
+ *  - draw to a single canvas instead of swapping <img> elements
+ */
+(function () {
+    'use strict';
+
+    const PC = window.PC;
+    const PCSource = window.PCSource;
+
+    const PREVIEW_MAX = 2400;
+    const THUMB_MAX = 200;
+    const CACHE_LIMIT = 6;
+    const PREFETCH_OFFSETS = [1, 2, -1];
+    const VERSION = '1.0.0';
+
+    const el = {
+        stage: document.getElementById('stage'),
+        empty: document.getElementById('empty'),
+        emptyCard: document.querySelector('.empty-card'),
+        viewer: document.getElementById('viewer'),
+        canvas: document.getElementById('preview'),
+        photoName: document.getElementById('photoName'),
+        photoMeta: document.getElementById('photoMeta'),
+        rejectedFlag: document.getElementById('rejectedFlag'),
+        loading: document.getElementById('loading'),
+        filmstrip: document.getElementById('filmstrip'),
+        folderChip: document.getElementById('folderChip'),
+        folderName: document.getElementById('folderName'),
+        sourceKind: document.getElementById('sourceKind'),
+        stats: document.getElementById('stats'),
+        statReviewed: document.getElementById('statReviewed'),
+        statKept: document.getElementById('statKept'),
+        statRejected: document.getElementById('statRejected'),
+        progress: document.getElementById('progress'),
+        openBtn: document.getElementById('openBtn'),
+        emptyOpen: document.getElementById('emptyOpen'),
+        applyBtn: document.getElementById('applyBtn'),
+        prevBtn: document.getElementById('prevBtn'),
+        nextBtn: document.getElementById('nextBtn'),
+        keepBtn: document.getElementById('keepBtn'),
+        rejectBtn: document.getElementById('rejectBtn'),
+        undoBtn: document.getElementById('undoBtn'),
+        helpBtn: document.getElementById('helpBtn'),
+        helpDialog: document.getElementById('helpDialog'),
+        controls: document.getElementById('controls'),
+        helpNote: document.getElementById('helpNote'),
+        modeBadge: document.getElementById('modeBadge'),
+        toast: document.getElementById('toast')
+    };
+
+    const state = {
+        source: null,
+        entries: [],
+        byId: new Map(),
+        index: 0,
+        generation: 0,
+        cache: new Map(),
+        history: [],
+        thumbUrls: new Map(),
+        prefetching: new Set(),
+        busy: false,
+        observer: null,
+        currentBitmap: null
+    };
+
+    // ---------------------------------------------------------------- workers
+
+    function workerURL() {
+        const tag = document.getElementById('pc-worker-source');
+        if (tag && tag.textContent && tag.textContent.trim()) {
+            return URL.createObjectURL(new Blob([tag.textContent], { type: 'text/javascript' }));
+        }
+        return 'worker.js';
+    }
+
+    const workerUrl = workerURL();
+    const previewWorker = new Worker(workerUrl);
+    const thumbWorker = new Worker(workerUrl);
+
+    let requestId = 0;
+    const pending = new Map();
+
+    function onWorkerMessage(event) {
+        const data = event.data || {};
+        const waiter = pending.get(data.id);
+        if (!waiter) return;
+        pending.delete(data.id);
+        if (data.ok) waiter.resolve(data.bitmap || data.blob);
+        else waiter.reject(new Error(data.error || '解码失败'));
+    }
+
+    previewWorker.onmessage = onWorkerMessage;
+    thumbWorker.onmessage = onWorkerMessage;
+
+    function request(worker, payload, priority) {
+        return new Promise(function (resolve, reject) {
+            const id = ++requestId;
+            pending.set(id, { resolve: resolve, reject: reject });
+            worker.postMessage(Object.assign({ id: id, priority: priority || 0 }, payload));
+        });
+    }
+
+    // ------------------------------------------------------------------ cache
+
+    function currentEntry() {
+        return state.entries[state.index] || null;
+    }
+
+    function cachePut(id, bitmap) {
+        const existing = state.cache.get(id);
+        if (existing && existing !== bitmap) existing.close();
+        state.cache.set(id, bitmap);
+
+        while (state.cache.size > CACHE_LIMIT) {
+            const activeId = currentEntry() ? currentEntry().id : null;
+            let victim = null;
+            for (const key of state.cache.keys()) {
+                if (key !== activeId) {
+                    victim = key;
+                    break;
+                }
+            }
+            if (victim === null) break;
+            state.cache.get(victim).close();
+            state.cache.delete(victim);
+        }
+    }
+
+    function clearCache() {
+        state.cache.forEach(function (bitmap) {
+            bitmap.close();
+        });
+        state.cache.clear();
+        state.currentBitmap = null;
+    }
+
+    // ---------------------------------------------------------------- drawing
+
+    function canvasContext() {
+        return el.canvas.getContext('2d', { alpha: false });
+    }
+
+    function resizeCanvas() {
+        const rect = el.stage.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.max(1, Math.floor(rect.width * dpr));
+        const height = Math.max(1, Math.floor(rect.height * dpr));
+        if (el.canvas.width !== width || el.canvas.height !== height) {
+            el.canvas.width = width;
+            el.canvas.height = height;
+        }
+        return { dpr: dpr, width: width, height: height };
+    }
+
+    function drawBitmap(bitmap) {
+        if (!bitmap) return;
+        state.currentBitmap = bitmap;
+        const size = resizeCanvas();
+        const context = canvasContext();
+        const pad = Math.round(26 * size.dpr);
+        const availableWidth = Math.max(1, size.width - pad * 2);
+        const availableHeight = Math.max(1, size.height - pad * 2);
+        const scale = Math.min(availableWidth / bitmap.width, availableHeight / bitmap.height);
+        const drawWidth = Math.max(1, bitmap.width * scale);
+        const drawHeight = Math.max(1, bitmap.height * scale);
+
+        const x = Math.round((size.width - drawWidth) / 2);
+        const y = Math.round((size.height - drawHeight) / 2);
+
+        context.fillStyle = '#080a0e';
+        context.fillRect(0, 0, size.width, size.height);
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+
+        // A soft shadow lifts the photo off the background without extra DOM.
+        context.save();
+        context.shadowColor = 'rgba(0, 0, 0, 0.55)';
+        context.shadowBlur = 32 * size.dpr;
+        context.shadowOffsetY = 12 * size.dpr;
+        context.drawImage(bitmap, x, y, Math.round(drawWidth), Math.round(drawHeight));
+        context.restore();
+    }
+
+    let resizeFrame = 0;
+    window.addEventListener('resize', function () {
+        if (resizeFrame) cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(function () {
+            resizeFrame = 0;
+            if (state.currentBitmap) drawBitmap(state.currentBitmap);
+        });
+    });
+
+    // ----------------------------------------------------------------- chrome
+
+    let loadingTimer = 0;
+
+    function showLoadingSoon(generation) {
+        clearTimeout(loadingTimer);
+        el.loading.hidden = true;
+        loadingTimer = setTimeout(function () {
+            if (generation === state.generation) el.loading.hidden = false;
+        }, 140);
+    }
+
+    function hideLoading() {
+        clearTimeout(loadingTimer);
+        el.loading.hidden = true;
+    }
+
+    function updateStats() {
+        let reviewed = 0;
+        let kept = 0;
+        let rejected = 0;
+        for (const entry of state.entries) {
+            if (entry.rejected) {
+                rejected += 1;
+                reviewed += 1;
+            } else if (entry.kept) {
+                kept += 1;
+                reviewed += 1;
+            }
+        }
+        el.statReviewed.textContent = String(reviewed);
+        el.statKept.textContent = String(kept);
+        el.statRejected.textContent = String(rejected);
+        el.applyBtn.textContent = rejected ? '应用删除 · ' + rejected : '应用删除';
+        el.applyBtn.hidden = rejected === 0;
+        el.progress.textContent = PC.formatProgress(state.index, state.entries.length);
+        el.undoBtn.disabled = state.history.length === 0;
+    }
+
+    function updateFolderChrome() {
+        const source = state.source;
+        if (!source) return;
+        el.folderChip.hidden = false;
+        el.folderName.textContent = source.folderName || '未命名文件夹';
+        el.sourceKind.textContent = PCSource.describe(source);
+        el.stats.hidden = false;
+        el.filmstrip.hidden = state.entries.length === 0;
+        el.controls.hidden = state.entries.length === 0;
+        el.empty.hidden = true;
+        el.viewer.hidden = state.entries.length === 0;
+    }
+
+    function updateCurrentChrome() {
+        const entry = currentEntry();
+        el.prevBtn.disabled = state.index <= 0;
+        el.nextBtn.disabled = state.index >= state.entries.length - 1;
+        el.keepBtn.disabled = !entry;
+        el.rejectBtn.disabled = !entry;
+        el.rejectedFlag.hidden = !entry || !entry.rejected;
+        if (entry) {
+            el.photoName.textContent = entry.name;
+        }
+        el.progress.textContent = PC.formatProgress(state.index, state.entries.length);
+        updateStats();
+        highlightCurrentThumb();
+    }
+
+    function setBusy(busy) {
+        state.busy = busy;
+        el.openBtn.disabled = busy;
+        el.emptyOpen.disabled = busy;
+        el.openBtn.textContent = busy ? '读取中…' : '打开文件夹';
+    }
+
+    let toastTimer = 0;
+
+    function toast(message, tone) {
+        el.toast.textContent = message;
+        el.toast.className = 'toast show' + (tone === 'bad' ? ' bad' : '');
+        el.toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+            el.toast.className = 'toast';
+            setTimeout(function () { el.toast.hidden = true; }, 200);
+        }, 2600);
+    }
+
+    function showError(error) {
+        const message = String((error && error.message) || error || '未知错误');
+        toast(message, 'bad');
+        console.error(error);
+    }
+
+    // ------------------------------------------------------------ photo display
+
+    async function showIndex(index) {
+        if (!state.entries.length) return;
+        const next = PC.clampIndex(index, state.entries.length);
+        const entry = state.entries[next];
+
+        state.index = next;
+        state.generation += 1;
+        const generation = state.generation;
+
+        updateCurrentChrome();
+        el.rejectedFlag.hidden = !entry.rejected;
+        el.photoName.textContent = entry.name;
+        el.photoMeta.textContent = '';
+
+        const cached = state.cache.get(entry.id);
+        if (cached) {
+            drawBitmap(cached);
+            hideLoading();
+            schedulePrefetch();
+            return;
+        }
+
+        showLoadingSoon(generation);
+        try {
+            const blob = await PCSource.blobFor(entry);
+            const bitmap = await request(
+                previewWorker,
+                { kind: 'preview', blob: blob, maxPixel: PREVIEW_MAX },
+                0
+            );
+            if (generation !== state.generation) {
+                bitmap.close();
+                return;
+            }
+            cachePut(entry.id, bitmap);
+            drawBitmap(bitmap);
+            el.photoMeta.textContent =
+                bitmap.width + ' × ' + bitmap.height + ' · ' + PC.formatBytes(blob.size);
+            schedulePrefetch();
+        } catch (error) {
+            if (generation === state.generation) showError(error);
+        } finally {
+            if (generation === state.generation) hideLoading();
+        }
+    }
+
+    async function schedulePrefetch() {
+        for (const offset of PREFETCH_OFFSETS) {
+            const index = state.index + offset;
+            const entry = state.entries[index];
+            if (!entry || state.cache.has(entry.id) || state.prefetching.has(entry.id)) continue;
+
+            state.prefetching.add(entry.id);
+            try {
+                const blob = await PCSource.blobFor(entry);
+                const bitmap = await request(
+                    previewWorker,
+                    { kind: 'preview', blob: blob, maxPixel: PREVIEW_MAX },
+                    20
+                );
+                if (!state.byId.has(entry.id) || state.cache.has(entry.id)) {
+                    bitmap.close();
+                    continue;
+                }
+                cachePut(entry.id, bitmap);
+            } catch (error) {
+                // Prefetching is best effort.
+            } finally {
+                state.prefetching.delete(entry.id);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------- filmstrip
+
+    function ensureObserver() {
+        if (state.observer) state.observer.disconnect();
+        state.observer = new IntersectionObserver(function (entries) {
+            for (const record of entries) {
+                if (record.isIntersecting) {
+                    state.observer.unobserve(record.target);
+                    loadThumb(record.target);
+                }
+            }
+        }, { root: el.filmstrip, rootMargin: '320px' });
+    }
+
+    function renderFilmstrip() {
+        el.filmstrip.innerHTML = '';
+        state.thumbUrls.forEach(function (url) { URL.revokeObjectURL(url); });
+        state.thumbUrls.clear();
+        state.byId = new Map();
+        ensureObserver();
+
+        const fragment = document.createDocumentFragment();
+        state.entries.forEach(function (entry, index) {
+            state.byId.set(entry.id, entry);
+
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'thumb';
+            cell.dataset.id = entry.id;
+            cell.title = entry.name;
+            cell.setAttribute('aria-label', '第 ' + (index + 1) + ' 张：' + entry.name);
+            if (entry.rejected) cell.classList.add('is-rejected');
+
+            const number = document.createElement('span');
+            number.className = 'thumb-index';
+            number.textContent = String(index + 1);
+            cell.appendChild(number);
+
+            const badge = document.createElement('span');
+            badge.className = 'thumb-badge';
+            badge.textContent = '删';
+            cell.appendChild(badge);
+
+            cell.addEventListener('click', function () {
+                showIndex(index);
+            });
+
+            fragment.appendChild(cell);
+            state.observer.observe(cell);
+        });
+
+        el.filmstrip.appendChild(fragment);
+        el.filmstrip.hidden = state.entries.length === 0;
+        highlightCurrentThumb();
+    }
+
+    async function loadThumb(cell) {
+        if (cell.dataset.loaded === '1') return;
+        cell.dataset.loaded = '1';
+        const entry = state.byId.get(cell.dataset.id);
+        if (!entry) return;
+
+        try {
+            const blob = await PCSource.blobFor(entry);
+            const thumb = await request(
+                thumbWorker,
+                { kind: 'thumb', blob: blob, maxPixel: THUMB_MAX, quality: 0.82 },
+                30
+            );
+            if (!cell.isConnected) return;
+            const url = URL.createObjectURL(thumb);
+            state.thumbUrls.set(entry.id, url);
+            const image = new Image();
+            image.alt = '';
+            image.decoding = 'async';
+            image.src = url;
+            cell.prepend(image);
+        } catch (error) {
+            cell.classList.add('is-broken');
+        }
+    }
+
+    function highlightCurrentThumb() {
+        const previous = el.filmstrip.querySelector('.thumb.is-current');
+        if (previous) previous.classList.remove('is-current');
+        const entry = currentEntry();
+        if (!entry) return;
+        const cell = el.filmstrip.querySelector('.thumb[data-id="' + cssEscape(entry.id) + '"]');
+        if (!cell) return;
+        cell.classList.add('is-current');
+        cell.scrollIntoView({ inline: 'center', block: 'nearest' });
+    }
+
+    function cssEscape(value) {
+        if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value);
+        return String(value).replace(/["\\]/g, '\\$&');
+    }
+
+    // --------------------------------------------------------------- sources
+
+    function loadSource(source) {
+        clearCache();
+        state.source = source;
+        state.entries = source.entries.slice();
+        state.index = 0;
+        state.history = [];
+        state.generation += 1;
+        state.prefetching.clear();
+        state.byId = new Map();
+
+        updateFolderChrome();
+        renderFilmstrip();
+
+        if (!state.entries.length) {
+            el.viewer.hidden = true;
+            el.empty.hidden = false;
+            el.filmstrip.hidden = true;
+            el.stats.hidden = true;
+            el.controls.hidden = true;
+            el.progress.textContent = '0 张';
+            toast(source.skipped ? '没有可预览的照片（已跳过 ' + source.skipped + ' 张 HEIC/HIF）' : '这个文件夹里没有可预览的照片', 'bad');
+            return;
+        }
+
+        el.empty.hidden = true;
+        el.viewer.hidden = false;
+        updateCurrentChrome();
+        showIndex(0);
+
+        if (source.skipped) {
+            toast('已跳过 ' + source.skipped + ' 张 HEIC/HIF，请用 macOS 版查看');
+        }
+    }
+
+    // --------------------------------------------------------------- actions
+
+    function mark(entry, changes) {
+        state.history.push({
+            index: state.index,
+            id: entry.id,
+            rejected: entry.rejected,
+            kept: entry.kept
+        });
+        entry.rejected = !!changes.rejected;
+        entry.kept = !!changes.kept;
+        syncThumbState(entry);
+        updateStats();
+    }
+
+    function syncThumbState(entry) {
+        const cell = el.filmstrip.querySelector('.thumb[data-id="' + cssEscape(entry.id) + '"]');
+        if (!cell) return;
+        cell.classList.toggle('is-rejected', !!entry.rejected);
+    }
+
+    function advance(delta) {
+        const next = state.index + delta;
+        if (next < 0) return;
+        if (next >= state.entries.length) {
+            toast('已经到最后一张了');
+            return;
+        }
+        showIndex(next);
+    }
+
+    function keepCurrent() {
+        const entry = currentEntry();
+        if (!entry) return;
+        mark(entry, { rejected: false, kept: true });
+        advance(1);
+    }
+
+    function rejectCurrent() {
+        const entry = currentEntry();
+        if (!entry) return;
+        mark(entry, { rejected: true, kept: false });
+        advance(1);
+    }
+
+    function undo() {
+        const last = state.history.pop();
+        if (!last) {
+            toast('没有可撤销的操作');
+            return;
+        }
+        const entry = state.byId.get(last.id);
+        if (!entry) {
+            updateStats();
+            return;
+        }
+        entry.rejected = last.rejected;
+        entry.kept = last.kept;
+        syncThumbState(entry);
+        showIndex(last.index);
+        toast('已撤销');
+    }
+
+    async function applyDeletes() {
+        const rejected = state.entries.filter(function (entry) { return entry.rejected; });
+        if (!rejected.length) {
+            toast('还没有标记删除的照片');
+            return;
+        }
+        if (!state.source || !state.source.canDelete) {
+            toast('当前打开方式不支持删除，请用桌面版或 Chrome/Edge 选文件夹', 'bad');
+            return;
+        }
+
+        const message = state.source.canRestore
+            ? '把 ' + rejected.length + ' 张照片移到系统回收站？'
+            : '永久删除 ' + rejected.length + ' 张照片（无法恢复），确定吗？';
+        if (!window.confirm(message)) return;
+
+        setBusy(true);
+        try {
+            const result = await PCSource.removeEntries(state.source, rejected);
+            const removedIds = new Set(result.removed.map(function (entry) { return entry.id; }));
+
+            state.entries = state.entries.filter(function (entry) {
+                return !removedIds.has(entry.id);
+            });
+            state.history = [];
+            removedIds.forEach(function (id) {
+                const bitmap = state.cache.get(id);
+                if (bitmap) {
+                    bitmap.close();
+                    state.cache.delete(id);
+                }
+            });
+
+            renderFilmstrip();
+            updateStats();
+
+            if (!state.entries.length) {
+                el.viewer.hidden = true;
+                el.empty.hidden = false;
+                el.filmstrip.hidden = true;
+                el.controls.hidden = true;
+                el.progress.textContent = '0 张';
+                toast('全部处理完成');
+            } else {
+                showIndex(Math.min(state.index, state.entries.length - 1));
+                toast(
+                    result.failed
+                        ? '已删除 ' + result.removed.length + ' 张，' + result.failed + ' 张失败'
+                        : '已删除 ' + result.removed.length + ' 张',
+                    result.failed ? 'bad' : ''
+                );
+            }
+        } catch (error) {
+            showError(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    // ----------------------------------------------------------------- events
+
+    function openFolder() {
+        if (state.busy) return;
+        setBusy(true);
+        PCSource.pickFolder()
+            .then(function (source) {
+                if (source) loadSource(source);
+            })
+            .catch(showError)
+            .finally(function () { setBusy(false); });
+    }
+
+    el.openBtn.addEventListener('click', openFolder);
+    el.emptyOpen.addEventListener('click', openFolder);
+    el.prevBtn.addEventListener('click', function () { advance(-1); });
+    el.nextBtn.addEventListener('click', function () { advance(1); });
+    el.keepBtn.addEventListener('click', keepCurrent);
+    el.rejectBtn.addEventListener('click', rejectCurrent);
+    el.undoBtn.addEventListener('click', undo);
+    el.applyBtn.addEventListener('click', applyDeletes);
+    el.helpBtn.addEventListener('click', function () { el.helpDialog.showModal(); });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        if (el.helpDialog.open) return;
+        if (event.target && /input|textarea|select/i.test(event.target.tagName)) return;
+
+        switch (event.key) {
+            case '1':
+                event.preventDefault();
+                keepCurrent();
+                break;
+            case '2':
+                event.preventDefault();
+                rejectCurrent();
+                break;
+            case '3':
+                event.preventDefault();
+                undo();
+                break;
+            case 'ArrowLeft':
+                event.preventDefault();
+                advance(-1);
+                break;
+            case 'ArrowRight':
+                event.preventDefault();
+                advance(1);
+                break;
+            default:
+                break;
+        }
+    });
+
+    // Drag & drop a folder or a bunch of photos.
+    let dragDepth = 0;
+
+    document.addEventListener('dragenter', function (event) {
+        event.preventDefault();
+        dragDepth += 1;
+        if (!state.busy) el.emptyCard.classList.add('dragover');
+    });
+
+    document.addEventListener('dragover', function (event) {
+        event.preventDefault();
+    });
+
+    document.addEventListener('dragleave', function (event) {
+        event.preventDefault();
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) el.emptyCard.classList.remove('dragover');
+    });
+
+    document.addEventListener('drop', function (event) {
+        event.preventDefault();
+        dragDepth = 0;
+        el.emptyCard.classList.remove('dragover');
+        if (state.busy) return;
+
+        const transfer = event.dataTransfer;
+        if (!transfer) return;
+
+        const item = transfer.items && transfer.items[0];
+        const dirEntry = item && typeof item.webkitGetAsEntry === 'function'
+            ? item.webkitGetAsEntry()
+            : null;
+
+        if (dirEntry && dirEntry.isDirectory) {
+            PCSource.entriesFromDirectoryEntry(dirEntry)
+                .then(function (source) {
+                    if (source && source.entries.length) loadSource(source);
+                    else toast('这个文件夹里没有可预览的照片', 'bad');
+                })
+                .catch(showError);
+            return;
+        }
+
+        const files = Array.prototype.slice.call(transfer.files || []);
+        if (!files.length) return;
+        const source = PCSource.entriesFromFiles(files);
+        if (source.entries.length) loadSource(source);
+        else toast('没有可预览的照片', 'bad');
+    });
+
+    // ------------------------------------------------------------------- init
+
+    function init() {
+        if (PCSource.isElectron()) {
+            el.modeBadge.textContent = 'Windows';
+            el.helpNote.textContent = '标记完成后点右上角「应用删除」，照片会进入系统回收站。';
+        } else {
+            el.modeBadge.textContent = 'Web';
+        }
+        el.progress.textContent = '0 张';
+        el.undoBtn.disabled = true;
+        updateStats();
+    }
+
+    // Small public surface: lets the page be embedded or driven by tests.
+    window.Photochooser = {
+        version: VERSION,
+        openFolder: openFolder,
+        openFiles: function (files) {
+            const source = PCSource.entriesFromFiles(Array.prototype.slice.call(files || []));
+            if (source.entries.length) loadSource(source);
+            return source.entries.length;
+        },
+        getState: function () {
+            return {
+                index: state.index,
+                total: state.entries.length,
+                rejected: state.entries.filter(function (entry) { return entry.rejected; }).length,
+                kept: state.entries.filter(function (entry) { return entry.kept; }).length,
+                name: currentEntry() ? currentEntry().name : null
+            };
+        }
+    };
+
+    init();
+})();
+
+</script>
+</body>
+</html>
