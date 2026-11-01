@@ -1,0 +1,21 @@
+{
+    "name": "photochooser-desktop",
+    "productName": "Photochooser",
+    "version": "1.0.0",
+    "description": "Photochooser desktop shell — the same web UI with native folder access and Recycle Bin deletes.",
+    "main": "main.js",
+    "author": "logex-linux",
+    "license": "MIT",
+    "private": true,
+    "scripts": {
+        "prestart": "node ../web/build.mjs && node -e \"require('node:fs').cpSync('../web/dist/web','./web',{recursive:true})\"",
+        "start": "electron .",
+        "package:win": "electron-packager . Photochooser --platform=win32 --arch=x64 --out=../dist/windows --overwrite --asar --prune=true --ignore=\"^/(tests|dist)$\"",
+        "stamp:win": "node set-icon.mjs"
+    },
+    "devDependencies": {
+        "@electron/packager": "^20.3.0",
+        "electron": "^45.2.1",
+        "resedit": "^3.1.0"
+    }
+}

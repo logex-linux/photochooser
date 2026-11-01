@@ -1,0 +1,23 @@
+# macOS / Swift
+.build/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+
+# Build outputs
+dist/
+web/dist/
+
+# Desktop shell
+desktop/node_modules/
+desktop/web/
+
+# Python test cache
+__pycache__/
+*.pyc
+
+# Editor / OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
